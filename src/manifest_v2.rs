@@ -1,3 +1,4 @@
+use crate::hash_value::{Sha160, Sha256};
 use crate::Error;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
@@ -18,7 +19,7 @@ pub struct Manifest {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Package {
     pub(crate) version: Option<String>,
-    pub(crate) git_commit_hash: Option<String>,
+    pub(crate) git_commit_hash: Option<Sha160>,
     #[serde(rename = "target")]
     pub(crate) targets: HashMap<String, PackageBuild>,
 }
@@ -27,10 +28,10 @@ pub struct Package {
 pub struct PackageBuild {
     pub(crate) available: bool,
     #[serde(rename = "hash")]
-    pub(crate) gz_hash: Option<String>,
+    pub(crate) gz_hash: Option<Sha256>,
     #[serde(rename = "url")]
     pub(crate) gz_url: Option<String>,
-    pub(crate) xz_hash: Option<String>,
+    pub(crate) xz_hash: Option<Sha256>,
     pub(crate) xz_url: Option<String>,
     pub(crate) components: Option<Vec<Component>>,
     pub(crate) extensions: Option<Vec<Component>>,
@@ -50,7 +51,7 @@ pub struct Artifact {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ArtifactBuild {
     #[serde(rename = "hash-sha256")]
-    pub(crate) hash_sha256: String,
+    pub(crate) hash_sha256: Sha256,
     pub(crate) url: String,
 }
 

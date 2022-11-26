@@ -1,4 +1,5 @@
 mod error;
+mod hash_value;
 mod manifest;
 mod manifest_v2;
 
