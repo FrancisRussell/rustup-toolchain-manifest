@@ -10,4 +10,7 @@ pub enum Error {
 
     #[error("A value could be parsed as a date: {0}")]
     InvalidDate(#[from] chrono::ParseError),
+
+    #[error("Package {0} listed as both target-dependent and independent")]
+    ConflictingTargetDependence(String),
 }
