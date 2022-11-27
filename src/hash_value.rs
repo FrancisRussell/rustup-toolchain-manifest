@@ -148,5 +148,5 @@ where
     }
 }
 
-pub type Sha160 = HashValue<typenum::U20>;
-pub type Sha256 = HashValue<typenum::U32>;
+pub type Hash160 = HashValue<typenum::U20>;
+pub type Hash256 = HashValue<typenum::U32>;

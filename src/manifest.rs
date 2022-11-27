@@ -1,3 +1,4 @@
+use crate::hash_value::Hash160;
 use crate::manifest_v2;
 use crate::Error;
 use chrono::NaiveDate;
@@ -9,14 +10,27 @@ pub struct Manifest {
     date: NaiveDate,
     profiles: HashMap<String, Vec<String>>,
     renames: HashMap<String, String>,
-    packages: HashMap<String, ()>,
+    packages: HashMap<String, Option<PackageVersion>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct PackageVersion {
+    version: String,
+    git_commit: Hash160,
 }
 
 impl Manifest {
     fn from_v2(parsed: manifest_v2::Manifest) -> Result<Manifest, Error> {
         let mut packages = HashMap::new();
         for (name, parsed_package) in parsed.packages {
-            packages.insert(name, ());
+            let version_info = match (parsed_package.version, parsed_package.git_commit_hash) {
+                (Some(version), Some(git_commit)) => Some(PackageVersion {
+                    version,
+                    git_commit,
+                }),
+                _ => None,
+            };
+            packages.insert(name, version_info);
         }
         let renames: HashMap<String, String> = parsed
             .renames
