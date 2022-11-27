@@ -1,4 +1,4 @@
-use crate::hash_value::{Hash160, Hash256};
+use crate::hash_value::HashValue;
 use crate::manifest_v2;
 use crate::Error;
 use chrono::NaiveDate;
@@ -18,7 +18,7 @@ pub struct Manifest {
 #[derive(Clone, Debug)]
 pub struct PackageInfo {
     version: String,
-    git_commit: Hash160,
+    git_commit: HashValue,
 }
 
 #[derive(Clone, Debug)]
@@ -32,12 +32,12 @@ pub struct PackageBuild {
     artifacts: HashMap<Compression, RemoteBinary>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Digest {
-    Sha256(Hash256),
+    Sha256,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Compression {
     Gzip,
     Xz,
@@ -46,7 +46,7 @@ pub enum Compression {
 #[derive(Clone, Debug)]
 pub struct RemoteBinary {
     url: String,
-    digests: Vec<Digest>,
+    digests: HashMap<Digest, HashValue>,
 }
 
 type Target = String;
@@ -61,23 +61,19 @@ impl Manifest {
     fn translate_build(from: &manifest_v2::PackageBuild) -> Option<PackageBuild> {
         if from.available {
             let mut artifacts = HashMap::new();
-            if let (Some(url), Some(hash)) = (&from.gz_url, &from.gz_hash) {
-                artifacts.insert(
-                    Compression::Gzip,
-                    RemoteBinary {
-                        url: url.to_string(),
-                        digests: vec![Digest::Sha256(*hash)],
-                    },
-                );
-            }
-            if let (Some(url), Some(hash)) = (&from.xz_url, &from.xz_hash) {
-                artifacts.insert(
-                    Compression::Xz,
-                    RemoteBinary {
-                        url: url.to_string(),
-                        digests: vec![Digest::Sha256(*hash)],
-                    },
-                );
+            for (compression, url, hash) in [
+                (Compression::Gzip, &from.gz_url, &from.gz_hash),
+                (Compression::Xz, &from.xz_url, &from.xz_hash),
+            ] {
+                if let (Some(url), Some(hash)) = (url, hash) {
+                    artifacts.insert(
+                        compression,
+                        RemoteBinary {
+                            url: url.to_string(),
+                            digests: std::iter::once((Digest::Sha256, hash.clone())).collect(),
+                        },
+                    );
+                }
             }
             let build = PackageBuild { artifacts };
             Some(build)

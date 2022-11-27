@@ -1,5 +1,3 @@
-use generic_array::typenum::{self, op, U2};
-use generic_array::{ArrayLength, GenericArray};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::str::FromStr;
 use thiserror::Error;
@@ -9,23 +7,16 @@ pub enum ParseError {
     #[error("Invalid byte: {0}")]
     InvalidByte(u8),
 
-    #[error("Invalid length: {0}")]
-    InvalidLength(usize),
+    #[error("Not a multiple of 8 bits")]
+    NotOctetSized,
 }
 
-#[derive(Default, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct HashValue<N: ArrayLength<u8>>
-where
-    N::ArrayType: Copy,
-{
-    bytes: GenericArray<u8, N>,
+#[derive(Default, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct HashValue {
+    bytes: Vec<u8>,
 }
 
-impl<N> HashValue<N>
-where
-    N: ArrayLength<u8>,
-    N::ArrayType: Copy,
-{
+impl HashValue {
     fn nibble_to_ascii(c: u8) -> u8 {
         match c {
             0..=9 => b'0' + c,
@@ -43,12 +34,8 @@ where
         }
     }
 
-    fn to_ascii<O>(&self) -> GenericArray<u8, op!(N * U2)>
-    where
-        N: std::ops::Mul<U2, Output = O>,
-        O: ArrayLength<u8>,
-    {
-        let mut characters = GenericArray::<u8, op!(N * U2)>::default();
+    fn to_ascii(&self) -> Vec<u8> {
+        let mut characters = vec![0u8; self.bytes.len() * 2];
         for (idx, character) in self.bytes.iter().enumerate() {
             let high = character >> 4;
             let low = character & 0xf;
@@ -59,24 +46,13 @@ where
     }
 }
 
-impl<N> std::fmt::Debug for HashValue<N>
-where
-    HashValue<N>: std::fmt::Display,
-    N: ArrayLength<u8>,
-    N::ArrayType: Copy,
-{
+impl std::fmt::Debug for HashValue {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(formatter, "\"{}\"", self)
     }
 }
 
-impl<N, O> std::fmt::Display for HashValue<N>
-where
-    N: ArrayLength<u8>,
-    N::ArrayType: Copy,
-    N: std::ops::Mul<U2, Output = O>,
-    O: ArrayLength<u8>,
-{
+impl std::fmt::Display for HashValue {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         let ascii = self.to_ascii();
         let ascii = unsafe { std::str::from_utf8_unchecked(&ascii) };
@@ -84,13 +60,7 @@ where
     }
 }
 
-impl<N, O> Serialize for HashValue<N>
-where
-    N: ArrayLength<u8>,
-    N::ArrayType: Copy,
-    N: std::ops::Mul<U2, Output = O>,
-    O: ArrayLength<u8>,
-{
+impl Serialize for HashValue {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -105,12 +75,8 @@ where
     }
 }
 
-impl<'a, N> Deserialize<'a> for HashValue<N>
-where
-    N: ArrayLength<u8> + typenum::ToInt<usize>,
-    N::ArrayType: Copy,
-{
-    fn deserialize<D>(deserializer: D) -> Result<HashValue<N>, D::Error>
+impl<'a> Deserialize<'a> for HashValue {
+    fn deserialize<D>(deserializer: D) -> Result<HashValue, D::Error>
     where
         D: Deserializer<'a>,
     {
@@ -118,26 +84,22 @@ where
             let s = String::deserialize(deserializer)?;
             Ok(HashValue::from_str(s.as_str()).map_err(serde::de::Error::custom)?)
         } else {
-            let bytes = <GenericArray<u8, N>>::deserialize(deserializer)?;
+            let bytes = <Vec<u8>>::deserialize(deserializer)?;
             Ok(HashValue { bytes })
         }
     }
 }
 
-impl<N> std::str::FromStr for HashValue<N>
-where
-    N: ArrayLength<u8> + typenum::ToInt<usize>,
-    N::ArrayType: Copy,
-{
+impl std::str::FromStr for HashValue {
     type Err = ParseError;
 
-    fn from_str(string: &str) -> Result<HashValue<N>, ParseError> {
+    fn from_str(string: &str) -> Result<HashValue, ParseError> {
         let string = string.as_bytes();
         let length = string.len();
-        if length != N::to_int() * 2 {
-            Err(ParseError::InvalidLength(length))
+        if length % 2 != 0 {
+            Err(ParseError::NotOctetSized)
         } else {
-            let mut bytes = GenericArray::<u8, N>::default();
+            let mut bytes = vec![0u8; length / 2];
             for (idx, byte) in bytes.iter_mut().enumerate() {
                 let high = Self::ascii_to_nibble(string[idx * 2])?;
                 let low = Self::ascii_to_nibble(string[idx * 2 + 1])?;
@@ -147,6 +109,3 @@ where
         }
     }
 }
-
-pub type Hash160 = HashValue<typenum::U20>;
-pub type Hash256 = HashValue<typenum::U32>;
