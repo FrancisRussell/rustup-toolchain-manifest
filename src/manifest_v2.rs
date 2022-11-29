@@ -58,8 +58,8 @@ pub struct ArtifactBuild {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Component {
     #[serde(rename = "pkg")]
-    package: String,
-    target: String,
+    pub(crate) package: String,
+    pub(crate) target: String,
 }
 
 pub fn try_parse_manifest(string: &str) -> Result<Manifest, Error> {

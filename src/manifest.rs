@@ -1,60 +1,66 @@
 use crate::hash_value::HashValue;
 use crate::manifest_v2;
+use crate::supported_target::{SupportedTarget, TARGET_INDEPENDENT_NAME};
 use crate::Error;
 use chrono::NaiveDate;
 use std::collections::HashMap;
-
-const TARGET_INDEPENDENT_NAME: &str = "*";
+use std::str::FromStr;
+use target_lexicon::Triple;
 
 #[derive(Clone, Debug)]
 pub struct Manifest {
     version: String,
     date: NaiveDate,
     profiles: HashMap<String, Vec<String>>,
-    renames: HashMap<String, String>,
+    _renames: HashMap<String, String>,
     packages: HashMap<String, PackageBuilds>,
+    components: HashMap<Triple, HashMap<(String, SupportedTarget), Component>>,
+    component_name_map: HashMap<Triple, HashMap<String, (String, SupportedTarget)>>,
 }
 
 #[derive(Clone, Debug)]
-pub struct PackageInfo {
+struct Component {
+    is_extension: bool,
+}
+
+#[derive(Clone, Debug)]
+struct PackageInfo {
     version: String,
     git_commit: HashValue,
 }
 
 #[derive(Clone, Debug)]
-pub struct PackageBuilds {
+struct PackageBuilds {
     info: Option<PackageInfo>,
     artifacts: TargetMap<Option<PackageBuild>>,
 }
 
 #[derive(Clone, Debug)]
-pub struct PackageBuild {
+struct PackageBuild {
     artifacts: HashMap<Compression, RemoteBinary>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Digest {
+enum Digest {
     Sha256,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Compression {
+enum Compression {
     Gzip,
     Xz,
 }
 
 #[derive(Clone, Debug)]
-pub struct RemoteBinary {
+struct RemoteBinary {
     url: String,
     digests: HashMap<Digest, HashValue>,
 }
 
-type Target = String;
-
 #[derive(Clone, Debug)]
 pub enum TargetMap<V> {
     Independent(V),
-    Dependent(HashMap<Target, V>),
+    Dependent(HashMap<Triple, V>),
 }
 
 impl Manifest {
@@ -84,11 +90,11 @@ impl Manifest {
 
     fn from_v2(parsed: manifest_v2::Manifest) -> Result<Manifest, Error> {
         let mut packages = HashMap::with_capacity(parsed.packages.len());
-        for (name, parsed_package) in parsed.packages {
-            let version_info = match (parsed_package.version, parsed_package.git_commit_hash) {
+        for (name, parsed_package) in &parsed.packages {
+            let version_info = match (&parsed_package.version, &parsed_package.git_commit_hash) {
                 (Some(version), Some(git_commit)) => Some(PackageInfo {
-                    version,
-                    git_commit,
+                    version: version.to_string(),
+                    git_commit: git_commit.clone(),
                 }),
                 _ => None,
             };
@@ -101,12 +107,16 @@ impl Manifest {
                     .expect("Failed to extract target-independent package");
                 TargetMap::Independent(Self::translate_build(build))
             } else {
-                let mut artifacts = HashMap::with_capacity(parsed_package.targets.len());
-                for (target_name, parsed_target) in parsed_package.targets {
+                let mut artifacts: HashMap<Triple, _> =
+                    HashMap::with_capacity(parsed_package.targets.len());
+                for (target_name, parsed_target) in &parsed_package.targets {
                     if target_name == TARGET_INDEPENDENT_NAME {
-                        return Err(Error::ConflictingTargetDependence(name));
+                        return Err(Error::ConflictingTargetDependence(name.to_string()));
                     }
-                    artifacts.insert(target_name, Self::translate_build(&parsed_target));
+                    artifacts.insert(
+                        Triple::from_str(target_name.as_str())?,
+                        Self::translate_build(&parsed_target),
+                    );
                 }
                 TargetMap::Dependent(artifacts)
             };
@@ -114,21 +124,83 @@ impl Manifest {
                 info: version_info,
                 artifacts,
             };
-            packages.insert(name, builds);
+            packages.insert(name.to_string(), builds);
+        }
+        let mut components = HashMap::new();
+        let rust = parsed.packages.get("rust").ok_or(Error::RustMissing)?;
+        for (target, build) in &rust.targets {
+            let mut target_components = HashMap::new();
+            let parsed_components = &build.components;
+            let parsed_extensions = &build.extensions;
+            for (parsed_components, is_extension) in
+                [(parsed_components, false), (parsed_extensions, true)]
+            {
+                for parsed_component in parsed_components.iter().flatten() {
+                    let component = Component { is_extension };
+                    let package = parsed_component.package.to_string();
+                    let component_target =
+                        SupportedTarget::from_str(parsed_component.target.as_str())?;
+                    target_components.insert((package, component_target), component);
+                }
+            }
+            components.insert(Triple::from_str(target.as_str())?, target_components);
         }
         let renames: HashMap<String, String> = parsed
             .renames
             .into_iter()
             .map(|(from, rename)| (from, rename.to))
             .collect();
+        let component_name_map = Self::build_component_name_map(&components, &renames);
         let result = Manifest {
             version: parsed.manifest_version,
             date: parsed.date,
             profiles: parsed.profiles,
-            renames,
+            _renames: renames,
             packages,
+            components,
+            component_name_map,
         };
         Ok(result)
+    }
+
+    fn build_component_name_map(
+        components: &HashMap<Triple, HashMap<(String, SupportedTarget), Component>>,
+        renames: &HashMap<String, String>,
+    ) -> HashMap<Triple, HashMap<String, (String, SupportedTarget)>> {
+        let inverse_renames: HashMap<&str, &str> = renames
+            .iter()
+            .map(|(k, v)| (v.as_str(), k.as_str()))
+            .collect();
+        let mut map = HashMap::with_capacity(components.len());
+        for (target, component_map) in components {
+            let mut name_map = HashMap::with_capacity(component_map.len());
+            for ((package_canonical, supported), _) in component_map {
+                // Add mappings for both the name in the manifest and the un-renamed package
+                // if a rename mapping exists
+                let unrenamed = inverse_renames.get(package_canonical.as_str());
+                for package_alias in std::iter::once(package_canonical.as_str())
+                    .chain(unrenamed.into_iter().copied())
+                {
+                    // If package is architecture dependent add it as $PACKAGE_NAME-$TRIPLE
+                    if let SupportedTarget::Dependent(pkg_triple) = supported {
+                        let full_name = format!("{}-{}", package_alias, pkg_triple);
+                        name_map.insert(
+                            full_name,
+                            (package_canonical.to_string(), supported.clone()),
+                        );
+                    }
+                    // If this package is for the current target or target-independent, add it without the suffix as well
+                    if supported.supports(target) {
+                        name_map.insert(
+                            package_alias.to_string(),
+                            (package_canonical.to_string(), supported.clone()),
+                        );
+                    }
+                }
+            }
+            map.insert(target.clone(), name_map);
+        }
+        map
     }
 
     pub fn get_date(&self) -> NaiveDate {
@@ -146,6 +218,19 @@ impl Manifest {
     pub fn get_components(&self, profile: &str) -> Option<Vec<String>> {
         self.profiles.get(profile).cloned()
     }
+
+    pub fn resolve_component_name(
+        &self,
+        target: &Triple,
+        component: &str,
+    ) -> Result<Option<(String, SupportedTarget)>, Error> {
+        // A component name might just be a name, but it might also be a name with an appended
+        // target triple. Naturally, hyphens are used to separate names from the target triple and
+        // also to separate components of the target triple. To confuse things even more, the prefix
+        // might need to be renamed.
+
+        todo!()
+    }
 }
 
 impl TryFrom<&str> for Manifest {
@@ -153,7 +238,6 @@ impl TryFrom<&str> for Manifest {
 
     fn try_from(string: &str) -> Result<Manifest, Error> {
         let parsed = manifest_v2::try_parse_manifest(string)?;
-        println!("{:#?}", parsed);
         Manifest::from_v2(parsed)
     }
 }

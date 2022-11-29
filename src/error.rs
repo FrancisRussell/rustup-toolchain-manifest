@@ -13,4 +13,13 @@ pub enum Error {
 
     #[error("Package {0} listed as both target-dependent and independent")]
     ConflictingTargetDependence(String),
+
+    #[error("Package \"rust\" was missing from manifest")]
+    RustMissing,
+
+    #[error("Unknown package")]
+    UnknownPackage,
+
+    #[error("Failed to parse target triple: {0}")]
+    TargetParse(#[from] target_lexicon::ParseError),
 }
