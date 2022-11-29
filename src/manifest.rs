@@ -3,7 +3,7 @@ use crate::manifest_v2;
 use crate::supported_target::{SupportedTarget, TARGET_INDEPENDENT_NAME};
 use crate::Error;
 use chrono::NaiveDate;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use target_lexicon::Triple;
 
@@ -16,6 +16,13 @@ pub struct Manifest {
     packages: HashMap<String, PackageBuilds>,
     components: HashMap<Triple, HashMap<(String, SupportedTarget), Component>>,
     component_name_map: HashMap<Triple, HashMap<String, (String, SupportedTarget)>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct InstallSpec {
+    pub profile: String,
+    pub components: HashSet<String>,
+    pub targets: HashSet<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -58,7 +65,7 @@ struct RemoteBinary {
 }
 
 #[derive(Clone, Debug)]
-pub enum TargetMap<V> {
+enum TargetMap<V> {
     Independent(V),
     Dependent(HashMap<Triple, V>),
 }
@@ -215,20 +222,61 @@ impl Manifest {
         self.profiles.keys().cloned().collect()
     }
 
-    pub fn get_components(&self, profile: &str) -> Option<Vec<String>> {
+    pub fn get_profile_components(&self, profile: &str) -> Option<Vec<String>> {
         self.profiles.get(profile).cloned()
     }
 
-    pub fn resolve_component_name(
+    pub fn resolve_component_name_to_package(
         &self,
         target: &Triple,
         component: &str,
-    ) -> Result<Option<(String, SupportedTarget)>, Error> {
-        // A component name might just be a name, but it might also be a name with an appended
-        // target triple. Naturally, hyphens are used to separate names from the target triple and
-        // also to separate components of the target triple. To confuse things even more, the prefix
-        // might need to be renamed.
+    ) -> Result<(String, SupportedTarget), Error> {
+        let name_map = self
+            .component_name_map
+            .get(target)
+            .ok_or_else(|| Error::UnknownTarget(target.to_string()))?;
+        let package = name_map.get(component).ok_or(Error::UnknownPackage)?;
+        Ok(package.clone())
+    }
 
+    pub fn find_needed_packages(
+        &self,
+        host: &Triple,
+        spec: &InstallSpec,
+    ) -> Result<HashSet<(String, SupportedTarget)>, Error> {
+        let mut result = HashSet::new();
+        let profile_components = self
+            .profiles
+            .get(&spec.profile)
+            .ok_or_else(|| Error::UnknownProfile(spec.profile.to_string()))?;
+        for component in profile_components {
+            match self.resolve_component_name_to_package(host, component) {
+                Ok(package) => {
+                    result.insert(package);
+                }
+                Err(Error::UnknownPackage) => {
+                    // Since profiles can apparently contain components that aren't
+                    // present on some platforms (e.g. rust-mingw), it is presumably
+                    // safe to ignore this, given that the profile component list
+                    // isn't supplied by the user.
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        for component in &spec.components {
+            let package = self.resolve_component_name_to_package(host, component)?;
+            result.insert(package);
+        }
+        for target in &spec.targets {
+            let target = Triple::from_str(&target)?;
+            let component = format!("{}-{}", "rust-std", target);
+            let package = self.resolve_component_name_to_package(host, &component)?;
+            result.insert(package);
+        }
+        Ok(result)
+    }
+
+    pub fn get_package_downloads(&self, name: &str, target: &SupportedTarget) {
         todo!()
     }
 }

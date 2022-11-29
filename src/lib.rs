@@ -5,4 +5,4 @@ mod manifest_v2;
 mod supported_target;
 
 pub use error::Error;
-pub use manifest::Manifest;
+pub use manifest::{InstallSpec, Manifest};

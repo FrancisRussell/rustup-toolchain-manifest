@@ -20,6 +20,12 @@ pub enum Error {
     #[error("Unknown package")]
     UnknownPackage,
 
+    #[error("Unknown target")]
+    UnknownTarget(String),
+
+    #[error("Unknown profile")]
+    UnknownProfile(String),
+
     #[error("Failed to parse target triple: {0}")]
     TargetParse(#[from] target_lexicon::ParseError),
 }
