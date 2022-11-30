@@ -38,28 +38,65 @@ struct PackageInfo {
 
 #[derive(Clone, Debug)]
 struct PackageBuilds {
+    name: String,
     info: Option<PackageInfo>,
     artifacts: TargetMap<Option<PackageBuild>>,
 }
 
+impl PackageBuilds {
+    fn get(&self, supported_target: &SupportedTarget) -> Result<PackageBuild, Error> {
+        match &self.artifacts {
+            TargetMap::Independent(build) => {
+                if let Some(build) = build {
+                    Ok(build.clone())
+                } else {
+                    Err(Error::PackageUnavailable(
+                        self.name.clone(),
+                        supported_target.clone(),
+                    ))
+                }
+            }
+            TargetMap::Dependent(map) => {
+                let target = if let SupportedTarget::Dependent(target) = supported_target {
+                    target
+                } else {
+                    return Err(Error::PackageNotTargetIndependent(self.name.clone()));
+                };
+                if let Some(build) = map.get(target) {
+                    if let Some(build) = build {
+                        Ok(build.clone())
+                    } else {
+                        Err(Error::PackageUnavailable(
+                            self.name.clone(),
+                            supported_target.clone(),
+                        ))
+                    }
+                } else {
+                    Err(Error::UnknownPackage)
+                }
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
-struct PackageBuild {
+pub struct PackageBuild {
     artifacts: HashMap<Compression, RemoteBinary>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum Digest {
+pub enum Digest {
     Sha256,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum Compression {
+pub enum Compression {
     Gzip,
     Xz,
 }
 
 #[derive(Clone, Debug)]
-struct RemoteBinary {
+pub struct RemoteBinary {
     url: String,
     digests: HashMap<Digest, HashValue>,
 }
@@ -128,6 +165,7 @@ impl Manifest {
                 TargetMap::Dependent(artifacts)
             };
             let builds = PackageBuilds {
+                name: name.to_string(),
                 info: version_info,
                 artifacts,
             };
@@ -239,7 +277,7 @@ impl Manifest {
         Ok(package.clone())
     }
 
-    pub fn find_needed_packages(
+    pub fn find_packages_for_install(
         &self,
         host: &Triple,
         spec: &InstallSpec,
@@ -276,8 +314,22 @@ impl Manifest {
         Ok(result)
     }
 
-    pub fn get_package_downloads(&self, name: &str, target: &SupportedTarget) {
-        todo!()
+    pub fn find_downloads_for_install(
+        &self,
+        host: &Triple,
+        spec: &InstallSpec,
+    ) -> Result<Vec<PackageBuild>, Error> {
+        let mut result = Vec::new();
+        let packages = self.find_packages_for_install(host, spec)?;
+        for (package_name, target) in &packages {
+            let builds = self
+                .packages
+                .get(package_name)
+                .ok_or(Error::UnknownPackage)?;
+            let build = builds.get(target)?;
+            result.push(build)
+        }
+        Ok(result)
     }
 }
 

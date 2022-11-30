@@ -1,3 +1,4 @@
+use crate::supported_target::SupportedTarget;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -20,12 +21,18 @@ pub enum Error {
     #[error("Unknown package")]
     UnknownPackage,
 
-    #[error("Unknown target")]
+    #[error("Unknown target: {0}")]
     UnknownTarget(String),
 
-    #[error("Unknown profile")]
+    #[error("Unknown profile: {0}")]
     UnknownProfile(String),
 
     #[error("Failed to parse target triple: {0}")]
     TargetParse(#[from] target_lexicon::ParseError),
+
+    #[error("Attempted to treat package {0} as architecture independent")]
+    PackageNotTargetIndependent(String),
+
+    #[error("Package {0} unavailable for target {1}")]
+    PackageUnavailable(String, SupportedTarget),
 }
