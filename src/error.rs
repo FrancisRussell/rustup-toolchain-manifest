@@ -9,17 +9,14 @@ pub enum Error {
     #[error("Manifest had incorect structure: {0}")]
     IncorrectManifestStructure(String),
 
-    #[error("A value could be parsed as a date: {0}")]
-    InvalidDate(#[from] chrono::ParseError),
-
     #[error("Package {0} listed as both target-dependent and independent")]
     ConflictingTargetDependence(String),
 
     #[error("Package \"rust\" was missing from manifest")]
     RustMissing,
 
-    #[error("Unknown package")]
-    UnknownPackage,
+    #[error("Package {0} unknown for target {1}")]
+    PackageUnknown(String, SupportedTarget),
 
     #[error("Unknown target: {0}")]
     UnknownTarget(String),

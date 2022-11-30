@@ -72,7 +72,10 @@ impl PackageBuilds {
                         ))
                     }
                 } else {
-                    Err(Error::UnknownPackage)
+                    Err(Error::PackageUnknown(
+                        self.name.clone(),
+                        supported_target.clone(),
+                    ))
                 }
             }
         }
@@ -273,7 +276,12 @@ impl Manifest {
             .component_name_map
             .get(target)
             .ok_or_else(|| Error::UnknownTarget(target.to_string()))?;
-        let package = name_map.get(component).ok_or(Error::UnknownPackage)?;
+        let package = name_map.get(component).ok_or_else(|| {
+            Error::PackageUnknown(
+                component.to_string(),
+                SupportedTarget::Dependent(target.clone()),
+            )
+        })?;
         Ok(package.clone())
     }
 
@@ -292,7 +300,7 @@ impl Manifest {
                 Ok(package) => {
                     result.insert(package);
                 }
-                Err(Error::UnknownPackage) => {
+                Err(Error::PackageUnknown(..)) => {
                     // Since profiles can apparently contain components that aren't
                     // present on some platforms (e.g. rust-mingw), it is presumably
                     // safe to ignore this, given that the profile component list
@@ -325,7 +333,7 @@ impl Manifest {
             let builds = self
                 .packages
                 .get(package_name)
-                .ok_or(Error::UnknownPackage)?;
+                .ok_or_else(|| Error::PackageUnknown(package_name.to_string(), target.clone()))?;
             let build = builds.get(target)?;
             result.push(build)
         }
