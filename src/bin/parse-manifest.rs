@@ -14,7 +14,7 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
     let input_file = cli.input_file;
-    let content = std::fs::read_to_string(&input_file).expect("Failed to read input file");
+    let content = std::fs::read_to_string(input_file).expect("Failed to read input file");
     let manifest = Manifest::try_from(content.as_str()).expect("Failed to parse manifest");
     let spec = InstallSpec {
         profile: "minimal".into(),

@@ -159,7 +159,7 @@ impl Manifest {
                     }
                     artifacts.insert(
                         Triple::from_str(target_name.as_str())?,
-                        Self::translate_build(&parsed_target),
+                        Self::translate_build(parsed_target),
                     );
                 }
                 TargetMap::Dependent(artifacts)
@@ -219,7 +219,7 @@ impl Manifest {
         let mut map = HashMap::with_capacity(components.len());
         for (target, component_map) in components {
             let mut name_map = HashMap::with_capacity(component_map.len());
-            for ((package_canonical, supported), _) in component_map {
+            for (package_canonical, supported) in component_map.keys() {
                 // Add mappings for both the name in the manifest and the un-renamed package
                 // if a rename mapping exists
                 let unrenamed = inverse_renames.get(package_canonical.as_str());
@@ -306,7 +306,7 @@ impl Manifest {
             result.insert(package);
         }
         for target in &spec.targets {
-            let target = Triple::from_str(&target)?;
+            let target = Triple::from_str(target)?;
             let component = format!("{}-{}", "rust-std", target);
             let package = self.resolve_component_name_to_package(host, &component)?;
             result.insert(package);
