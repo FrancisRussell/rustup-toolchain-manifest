@@ -74,6 +74,22 @@ pub struct Toolchain {
     pub host: Option<Triple>,
 }
 
+impl Toolchain {
+    pub fn manifest_url(&self) -> String {
+        if let Some(date) = &self.date {
+            format!(
+                "https://static.rust-lang.org/dist/{}/channel-rust-{}.toml",
+                date, self.channel
+            )
+        } else {
+            format!(
+                "https://static.rust-lang.org/dist/channel-rust-{}.toml",
+                self.channel
+            )
+        }
+    }
+}
+
 #[derive(Debug, Clone, Error)]
 pub enum ToolchainParseError {
     #[error("Failed to parse channel: {0}")]
@@ -104,8 +120,7 @@ impl FromStr for Toolchain {
 
     fn from_str(string: &str) -> Result<Toolchain, ToolchainParseError> {
         let mut split: VecDeque<_> = string.split("-").collect();
-        let channel =
-            Channel::from_str(split.pop_front().unwrap_or_default())?;
+        let channel = Channel::from_str(split.pop_front().unwrap_or_default())?;
         let mut result = Toolchain {
             channel,
             date: None,

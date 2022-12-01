@@ -43,9 +43,8 @@ fn main() {
         .expect("Failed to resolve downloads for install specification");
     println!("Downloads:\n{:#?}", downloads);
 
-    println!(
-        "{}",
-        Toolchain::from_str("stable-2022-12-01-x86_64-pc-windows-msvc")
-            .expect("Unable to parse toolchain")
-    );
+    let toolchain = Toolchain::from_str("nightly-2022-11-30-x86_64-pc-windows-msvc")
+        .expect("Unable to parse toolchain");
+    println!("Toolchain: {}", toolchain);
+    println!("Toolchain manifest: {}", toolchain.manifest_url());
 }
