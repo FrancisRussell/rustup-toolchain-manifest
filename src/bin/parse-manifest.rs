@@ -1,5 +1,5 @@
 use clap::Parser;
-use rust_toolchain_manifest::{InstallSpec, Manifest};
+use rust_toolchain_manifest::{InstallSpec, Manifest, Toolchain};
 use std::path::PathBuf;
 use std::str::FromStr;
 use target_lexicon::Triple;
@@ -42,4 +42,10 @@ fn main() {
         .find_downloads_for_install(&host, &spec)
         .expect("Failed to resolve downloads for install specification");
     println!("Downloads:\n{:#?}", downloads);
+
+    println!(
+        "{}",
+        Toolchain::from_str("stable-2022-12-01-x86_64-pc-windows-msvc")
+            .expect("Unable to parse toolchain")
+    );
 }
