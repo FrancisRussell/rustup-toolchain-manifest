@@ -84,7 +84,7 @@ impl PackageBuilds {
 
 #[derive(Clone, Debug)]
 pub struct PackageBuild {
-    artifacts: HashMap<Compression, RemoteBinary>,
+    pub artifacts: HashMap<Compression, RemoteBinary>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
