@@ -14,7 +14,7 @@ pub struct Manifest {
     profiles: HashMap<String, Vec<String>>,
     _renames: HashMap<String, String>,
     packages: HashMap<String, PackageBuilds>,
-    components: HashMap<Triple, HashMap<(String, SupportedTarget), Component>>,
+    _components: HashMap<Triple, HashMap<(String, SupportedTarget), Component>>,
     component_name_map: HashMap<Triple, HashMap<String, (String, SupportedTarget)>>,
 }
 
@@ -27,7 +27,7 @@ pub struct InstallSpec {
 
 #[derive(Clone, Debug)]
 struct Component {
-    is_extension: bool,
+    _is_extension: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -83,8 +83,34 @@ impl PackageBuilds {
 }
 
 #[derive(Clone, Debug)]
-pub struct PackageBuild {
-    pub artifacts: HashMap<Compression, RemoteBinary>,
+pub struct ManifestPackage {
+    pub name: String,
+    pub version: String,
+    pub git_commit: HashValue,
+    pub supported_target: SupportedTarget,
+    pub tarballs: Vec<(Compression, RemoteBinary)>,
+}
+
+impl ManifestPackage {
+    pub fn unique_identifier(&self) -> HashValue {
+        // Let's just choose the largest hash for now
+        let mut hashes: Vec<HashValue> = self
+            .tarballs
+            .iter()
+            .flat_map(|(_, r)| &r.digests)
+            .map(|(_, value)| value.clone())
+            .collect();
+        hashes.sort();
+        hashes
+            .last()
+            .cloned()
+            .unwrap_or_else(|| panic!("Missing digest for package {}", self.name.clone()))
+    }
+}
+
+#[derive(Clone, Debug)]
+struct PackageBuild {
+    artifacts: HashMap<Compression, RemoteBinary>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -94,6 +120,7 @@ pub enum Digest {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Compression {
+    None,
     Gzip,
     Xz,
 }
@@ -184,7 +211,9 @@ impl Manifest {
                 [(parsed_components, false), (parsed_extensions, true)]
             {
                 for parsed_component in parsed_components.iter().flatten() {
-                    let component = Component { is_extension };
+                    let component = Component {
+                        _is_extension: is_extension,
+                    };
                     let package = parsed_component.package.to_string();
                     let component_target =
                         SupportedTarget::from_str(parsed_component.target.as_str())?;
@@ -205,7 +234,7 @@ impl Manifest {
             profiles: parsed.profiles,
             _renames: renames,
             packages,
-            components,
+            _components: components,
             component_name_map,
         };
         Ok(result)
@@ -326,7 +355,7 @@ impl Manifest {
         &self,
         host: &Triple,
         spec: &InstallSpec,
-    ) -> Result<Vec<PackageBuild>, Error> {
+    ) -> Result<Vec<ManifestPackage>, Error> {
         let mut result = Vec::new();
         let packages = self.find_packages_for_install(host, spec)?;
         for (package_name, target) in &packages {
@@ -335,7 +364,22 @@ impl Manifest {
                 .get(package_name)
                 .ok_or_else(|| Error::PackageUnknown(package_name.to_string(), target.clone()))?;
             let build = builds.get(target)?;
-            result.push(build)
+            let info = builds
+                .info
+                .as_ref()
+                .ok_or_else(|| Error::MissingPackageVersion(package_name.clone()))?;
+            let package = ManifestPackage {
+                name: package_name.clone(),
+                version: info.version.clone(),
+                git_commit: info.git_commit.clone(),
+                supported_target: target.clone(),
+                tarballs: build
+                    .artifacts
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect(),
+            };
+            result.push(package)
         }
         Ok(result)
     }

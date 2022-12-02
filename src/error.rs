@@ -32,4 +32,7 @@ pub enum Error {
 
     #[error("Package {0} unavailable for target {1}")]
     PackageUnavailable(String, SupportedTarget),
+
+    #[error("Missing versioning information for package {0}")]
+    MissingPackageVersion(String),
 }
