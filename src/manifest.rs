@@ -100,8 +100,8 @@ pub enum Compression {
 
 #[derive(Clone, Debug)]
 pub struct RemoteBinary {
-    url: String,
-    digests: HashMap<Digest, HashValue>,
+    pub url: String,
+    pub digests: HashMap<Digest, HashValue>,
 }
 
 #[derive(Clone, Debug)]

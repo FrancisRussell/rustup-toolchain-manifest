@@ -6,5 +6,6 @@ mod supported_target;
 pub mod toolchain;
 
 pub use error::Error;
+pub use hash_value::HashValue;
 pub use manifest::{InstallSpec, Manifest};
 pub use toolchain::Toolchain;
