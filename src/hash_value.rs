@@ -46,6 +46,12 @@ impl HashValue {
     }
 }
 
+impl AsRef<[u8]> for HashValue {
+    fn as_ref(&self) -> &[u8] {
+        self.bytes.as_ref()
+    }
+}
+
 impl std::fmt::Debug for HashValue {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(formatter, "\"{}\"", self)
