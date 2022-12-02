@@ -1,6 +1,6 @@
 mod error;
 mod hash_value;
-mod manifest;
+pub mod manifest;
 mod manifest_v2;
 mod supported_target;
 pub mod toolchain;
