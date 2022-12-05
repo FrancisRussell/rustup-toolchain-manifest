@@ -44,6 +44,12 @@ impl HashValue {
         }
         characters
     }
+
+    pub fn from_bytes(bytes: &[u8]) -> HashValue {
+        HashValue {
+            bytes: bytes.to_vec(),
+        }
+    }
 }
 
 impl AsRef<[u8]> for HashValue {
