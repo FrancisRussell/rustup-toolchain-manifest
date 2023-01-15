@@ -2,15 +2,19 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::str::FromStr;
 use thiserror::Error;
 
+/// Parse errors for `HashValue`
 #[derive(Clone, Copy, Debug, Error)]
 pub enum ParseError {
+    /// An input character was invalid (not-hexadecimal)
     #[error("Invalid byte: {0}")]
     InvalidByte(u8),
 
+    /// The hash was not a mutiple of 8-bits (had an odd number of characters)
     #[error("Not a multiple of 8 bits")]
     NotOctetSized,
 }
 
+/// A dynamically sized hash used to represent Git SHAs and digest values
 #[derive(Default, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct HashValue {
     bytes: Vec<u8>,
@@ -34,6 +38,7 @@ impl HashValue {
         }
     }
 
+    /// Returns the value as ASCII characters
     fn to_ascii(&self) -> Vec<u8> {
         let mut characters = vec![0u8; self.bytes.len() * 2];
         for (idx, character) in self.bytes.iter().enumerate() {
@@ -45,10 +50,10 @@ impl HashValue {
         characters
     }
 
+    /// Converts from binary (not ASCII)
+    #[must_use]
     pub fn from_bytes(bytes: &[u8]) -> HashValue {
-        HashValue {
-            bytes: bytes.to_vec(),
-        }
+        HashValue { bytes: bytes.to_vec() }
     }
 }
 
@@ -108,9 +113,7 @@ impl std::str::FromStr for HashValue {
     fn from_str(string: &str) -> Result<HashValue, ParseError> {
         let string = string.as_bytes();
         let length = string.len();
-        if length % 2 != 0 {
-            Err(ParseError::NotOctetSized)
-        } else {
+        if length % 2 == 0 {
             let mut bytes = vec![0u8; length / 2];
             for (idx, byte) in bytes.iter_mut().enumerate() {
                 let high = Self::ascii_to_nibble(string[idx * 2])?;
@@ -118,6 +121,8 @@ impl std::str::FromStr for HashValue {
                 *byte = (high << 4) | low;
             }
             Ok(HashValue { bytes })
+        } else {
+            Err(ParseError::NotOctetSized)
         }
     }
 }

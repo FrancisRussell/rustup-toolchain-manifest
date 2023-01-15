@@ -1,8 +1,12 @@
 [package]
 name = "rust-toolchain-manifest"
-version = "0.1.0"
+authors = ["Francis Russell <francis@unchartedbackwaters.co.uk>"]
+version = "0.2.0"
 edition = "2021"
 license = "BSD-3-Clause"
+description = "Parses the Rust toolchain manifest"
+keywords = ["toolchain", "manifest"]
+repository = "https://github.com/FrancisRussell/rust-toolchain-manifest.git"
 
 [dependencies]
 chrono = { version = "0.4.23", default-features = false, features = [ "serde" ] }
