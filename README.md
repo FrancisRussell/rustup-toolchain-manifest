@@ -9,3 +9,6 @@ The Rust toolchain manifest format has clearly been extended over time and some
 aspects of it, in particular how missing packages and renames are handled, is
 quite confusing.  This library is a best-effort attempt to reverse-engineer the
 underlying meaning.
+
+This package is named `rustup-toolchain-manifest` only because
+`rust-toolchain-manifest` seems to have been name squatted.

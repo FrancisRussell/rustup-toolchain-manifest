@@ -1,7 +1,7 @@
 #![allow(clippy::uninlined_format_args)]
 
 use clap::Parser;
-use rust_toolchain_manifest::{InstallSpec, Manifest, Toolchain};
+use rustup_toolchain_manifest::{InstallSpec, Manifest, Toolchain};
 use std::path::PathBuf;
 use std::str::FromStr;
 use target_lexicon::Triple;
