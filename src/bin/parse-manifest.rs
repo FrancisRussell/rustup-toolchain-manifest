@@ -1,3 +1,5 @@
+#![allow(clippy::uninlined_format_args)]
+
 use clap::Parser;
 use rust_toolchain_manifest::{InstallSpec, Manifest, Toolchain};
 use std::path::PathBuf;

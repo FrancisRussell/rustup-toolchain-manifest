@@ -4,11 +4,19 @@ use std::str::FromStr;
 use target_lexicon::Triple;
 use thiserror::Error;
 
+/// A Rust release channel
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Channel {
+    /// The stable channel
     Stable,
+
+    /// The beta channel
     Beta,
+
+    /// The nightly channel
     Nightly,
+
+    /// A specific Rust compiler version
     Version(u16, u16, Option<u16>),
 }
 
@@ -28,11 +36,14 @@ impl std::fmt::Display for Channel {
     }
 }
 
+/// Errors which can occur while parsing a channel name
 #[derive(Clone, Debug, Error)]
 pub enum ChannelParseError {
+    /// An integer component failed to parse
     #[error("Could not parse version number component as integer")]
     IntegerParse,
 
+    /// A version had an invalid number of components
     #[error("Incorrect number of components in version: {0}")]
     InvalidVersionComponentCount(usize),
 }
@@ -46,32 +57,39 @@ impl FromStr for Channel {
             "beta" => Ok(Channel::Beta),
             "nightly" => Ok(Channel::Nightly),
             _ => {
-                let components: Result<Vec<u16>, _> = string.split(".").map(u16::from_str).collect();
+                let components: Result<Vec<u16>, _> = string.split('.').map(u16::from_str).collect();
                 let components = components.map_err(|_| ChannelParseError::IntegerParse)?;
                 if components.len() < 2 || components.len() > 3 {
                     return Err(ChannelParseError::InvalidVersionComponentCount(components.len()));
-                } else {
-                    assert!(components.len() >= 2);
-                    assert!(components.len() <= 3);
-                    Ok(Channel::Version(
-                        components[0],
-                        components[1],
-                        components.get(2).copied(),
-                    ))
                 }
+                assert!(components.len() >= 2);
+                assert!(components.len() <= 3);
+                Ok(Channel::Version(
+                    components[0],
+                    components[1],
+                    components.get(2).copied(),
+                ))
             }
         }
     }
 }
 
+/// Specification of a Rust toolchain (as typically given to Rustup)
 #[derive(Debug, Clone)]
 pub struct Toolchain {
+    /// The release channel
     pub channel: Channel,
+
+    /// The manifest date
     pub date: Option<NaiveDate>,
+
+    /// The target triple
     pub host: Option<Triple>,
 }
 
 impl Toolchain {
+    /// Returns the manifest URL for the specified toolchain
+    #[must_use]
     pub fn manifest_url(&self) -> String {
         if let Some(date) = &self.date {
             format!(
@@ -84,11 +102,14 @@ impl Toolchain {
     }
 }
 
+/// Parse errors for a toolchain string
 #[derive(Debug, Clone, Error)]
-pub enum ToolchainParseError {
+pub enum ParseError {
+    /// The channel name was invalid
     #[error("Failed to parse channel: {0}")]
     Channel(#[from] ChannelParseError),
 
+    /// The target name was invalid
     #[error("Failed to target: {0}")]
     Target(#[from] target_lexicon::ParseError),
 }
@@ -102,7 +123,7 @@ fn intersperse_hyphen<I: Iterator<Item = S>, S: AsRef<str>>(iter: I) -> String {
         if first {
             first = false;
         } else {
-            result.push('-')
+            result.push('-');
         }
         result.push_str(component.as_ref());
     }
@@ -110,10 +131,10 @@ fn intersperse_hyphen<I: Iterator<Item = S>, S: AsRef<str>>(iter: I) -> String {
 }
 
 impl FromStr for Toolchain {
-    type Err = ToolchainParseError;
+    type Err = ParseError;
 
-    fn from_str(string: &str) -> Result<Toolchain, ToolchainParseError> {
-        let mut split: VecDeque<_> = string.split("-").collect();
+    fn from_str(string: &str) -> Result<Toolchain, ParseError> {
+        let mut split: VecDeque<_> = string.split('-').collect();
         let channel = Channel::from_str(split.pop_front().unwrap_or_default())?;
         let mut result = Toolchain {
             channel,

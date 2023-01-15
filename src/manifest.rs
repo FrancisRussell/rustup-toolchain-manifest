@@ -6,6 +6,9 @@ use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use target_lexicon::Triple;
 
+/// Represents a Rust toolchain manifest.
+///
+/// The manifest is parsed from a file using `try_from`.
 #[derive(Clone, Debug)]
 pub struct Manifest {
     version: String,
@@ -17,10 +20,17 @@ pub struct Manifest {
     component_name_map: HashMap<Triple, HashMap<String, (String, SupportedTarget)>>,
 }
 
+/// An install specification for a Rust toolchain
 #[derive(Clone, Debug)]
 pub struct InstallSpec {
+    /// The toolchain profile
     pub profile: String,
+
+    /// The components to be installed (in addition to those implied by the
+    /// profile)
     pub components: HashSet<String>,
+
+    /// Architectures for which the Rust standard library should be installed
     pub targets: HashSet<String>,
 }
 
@@ -53,9 +63,7 @@ impl PackageBuilds {
                 }
             }
             TargetMap::Dependent(map) => {
-                let target = if let SupportedTarget::Dependent(target) = supported_target {
-                    target
-                } else {
+                let SupportedTarget::Dependent(target) = supported_target else {
                     return Err(Error::PackageNotTargetIndependent(self.name.clone()));
                 };
                 if let Some(build) = map.get(target) {
@@ -72,16 +80,34 @@ impl PackageBuilds {
     }
 }
 
+/// A package from a Rust toolchain manifest
 #[derive(Clone, Debug)]
-pub struct ManifestPackage {
+pub struct Package {
+    /// The package name
     pub name: String,
+
+    /// The package version
     pub version: String,
+
+    /// The git commit of the package source
     pub git_commit: HashValue,
+
+    /// Which targets this package supports
     pub supported_target: SupportedTarget,
+
+    /// The tarballs corresponding to this package, indexed by compression type
     pub tarballs: Vec<(Compression, RemoteBinary)>,
 }
 
-impl ManifestPackage {
+impl Package {
+    /// Returns a unique identifier for this package.
+    ///
+    /// Currently this is one of the download digests and might change between
+    /// releases.
+    ///
+    /// # Panics
+    /// Can panic if a package happens to contain no digests for its binary.
+    #[must_use]
     pub fn unique_identifier(&self) -> HashValue {
         // Let's just choose the largest hash for now
         let mut hashes: Vec<HashValue> = self
@@ -103,21 +129,33 @@ struct PackageBuild {
     artifacts: HashMap<Compression, RemoteBinary>,
 }
 
+/// Digest types
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Digest {
+    /// SHA-256
     Sha256,
 }
 
+/// Types of compression that might be applied to a remote binary
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Compression {
+    /// No compression
     None,
+
+    /// Gzip
     Gzip,
+
+    /// LZMA
     Xz,
 }
 
+/// A binary located at some URL
 #[derive(Clone, Debug)]
 pub struct RemoteBinary {
+    /// The URL of the remote binary
     pub url: String,
+
+    /// Available digests for the remote binary
     pub digests: HashMap<Digest, HashValue>,
 }
 
@@ -258,22 +296,36 @@ impl Manifest {
         map
     }
 
+    /// The manifest date
+    #[must_use]
     pub fn get_date(&self) -> NaiveDate {
         self.date
     }
 
+    /// The manifest version
+    #[must_use]
     pub fn get_version(&self) -> &str {
         self.version.as_str()
     }
 
+    /// The toolchain installation profiles (e.g. `default`, `minimal`)
+    #[must_use]
     pub fn get_profiles(&self) -> Vec<String> {
         self.profiles.keys().cloned().collect()
     }
 
+    /// Returns the components that a particular profile contains. Returns
+    /// `None` if the profile was not recognized.
+    #[must_use]
     pub fn get_profile_components(&self, profile: &str) -> Option<Vec<String>> {
         self.profiles.get(profile).cloned()
     }
 
+    /// Given a component name and a target triple, resolves the component to
+    /// package name, and the architecture that package supports. Note that
+    /// due to renaming, the package name may not be the same as the
+    /// supplied name, and that the returned package might be architecture
+    /// independent.
     pub fn resolve_component_name_to_package(
         &self,
         target: &Triple,
@@ -289,6 +341,9 @@ impl Manifest {
         Ok(package.clone())
     }
 
+    /// Given a target triple and a toolchain install specification, return a
+    /// list of package names and their corresponding architectures
+    /// necessary for that install.
     pub fn find_packages_for_install(
         &self,
         host: &Triple,
@@ -327,7 +382,10 @@ impl Manifest {
         Ok(result)
     }
 
-    pub fn find_downloads_for_install(&self, host: &Triple, spec: &InstallSpec) -> Result<Vec<ManifestPackage>, Error> {
+    /// Given a target triple and a toolchain install specification, return a
+    /// list of package descriptions which includes information about the
+    /// archives which need to be downloaded.
+    pub fn find_downloads_for_install(&self, host: &Triple, spec: &InstallSpec) -> Result<Vec<Package>, Error> {
         let mut result = Vec::new();
         let packages = self.find_packages_for_install(host, spec)?;
         for (package_name, target) in &packages {
@@ -340,14 +398,14 @@ impl Manifest {
                 .info
                 .as_ref()
                 .ok_or_else(|| Error::MissingPackageVersion(package_name.clone()))?;
-            let package = ManifestPackage {
+            let package = Package {
                 name: package_name.clone(),
                 version: info.version.clone(),
                 git_commit: info.git_commit.clone(),
                 supported_target: target.clone(),
-                tarballs: build.artifacts.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                tarballs: build.artifacts.iter().map(|(k, v)| (*k, v.clone())).collect(),
             };
-            result.push(package)
+            result.push(package);
         }
         Ok(result)
     }

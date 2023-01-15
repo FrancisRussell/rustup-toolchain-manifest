@@ -3,9 +3,12 @@ use target_lexicon::Triple;
 
 pub const TARGET_INDEPENDENT_NAME: &str = "*";
 
+/// The targets a package supports
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum SupportedTarget {
+    /// The package supports all targets
     Independent,
+    /// The package is specific to a particular target
     Dependent(Triple),
 }
 
@@ -31,6 +34,7 @@ impl FromStr for SupportedTarget {
 }
 
 impl SupportedTarget {
+    #[must_use]
     pub fn supports(&self, other: &Triple) -> bool {
         match self {
             SupportedTarget::Independent => true,
