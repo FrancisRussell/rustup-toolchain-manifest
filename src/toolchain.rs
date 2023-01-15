@@ -46,13 +46,10 @@ impl FromStr for Channel {
             "beta" => Ok(Channel::Beta),
             "nightly" => Ok(Channel::Nightly),
             _ => {
-                let components: Result<Vec<u16>, _> =
-                    string.split(".").map(u16::from_str).collect();
+                let components: Result<Vec<u16>, _> = string.split(".").map(u16::from_str).collect();
                 let components = components.map_err(|_| ChannelParseError::IntegerParse)?;
                 if components.len() < 2 || components.len() > 3 {
-                    return Err(ChannelParseError::InvalidVersionComponentCount(
-                        components.len(),
-                    ));
+                    return Err(ChannelParseError::InvalidVersionComponentCount(components.len()));
                 } else {
                     assert!(components.len() >= 2);
                     assert!(components.len() <= 3);
@@ -82,10 +79,7 @@ impl Toolchain {
                 date, self.channel
             )
         } else {
-            format!(
-                "https://static.rust-lang.org/dist/channel-rust-{}.toml",
-                self.channel
-            )
+            format!("https://static.rust-lang.org/dist/channel-rust-{}.toml", self.channel)
         }
     }
 }

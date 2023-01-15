@@ -46,9 +46,7 @@ impl HashValue {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> HashValue {
-        HashValue {
-            bytes: bytes.to_vec(),
-        }
+        HashValue { bytes: bytes.to_vec() }
     }
 }
 
