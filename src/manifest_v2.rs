@@ -63,6 +63,6 @@ pub struct Component {
 }
 
 pub fn try_parse_manifest(string: &str) -> Result<Manifest, Error> {
-    let parsed: Manifest = toml::from_str(string)?;
+    let parsed: Manifest = basic_toml::from_str(string)?;
     Ok(parsed)
 }
