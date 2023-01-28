@@ -9,11 +9,11 @@ keywords = ["toolchain", "manifest"]
 repository = "https://github.com/FrancisRussell/rustup-toolchain-manifest.git"
 
 [dependencies]
+basic-toml = "0.1.0"
 chrono = { version = "0.4.23", default-features = false, features = [ "serde" ] }
 serde = { version = "1.0.147", features = ["derive"] }
 target-lexicon = { version = "0.12.5", features = [ "std" ] }
 thiserror = "1.0.37"
-toml = "0.5.9"
 
 [dev-dependencies]
 clap = { version = "4.0.26", features = [ "derive" ] }

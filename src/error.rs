@@ -6,7 +6,7 @@ use thiserror::Error;
 pub enum Error {
     /// The manifest TOML failed to deserialize correctly
     #[error("TOML deserialization error: {0}")]
-    TomlDeserialize(#[from] toml::de::Error),
+    TomlDeserialize(#[from] basic_toml::Error),
 
     /// The manifest did not conform to the expected structure (parsing was fine
     /// though)
