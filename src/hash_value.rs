@@ -72,7 +72,7 @@ impl std::fmt::Debug for HashValue {
 impl std::fmt::Display for HashValue {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         let ascii = self.to_ascii();
-        let ascii = unsafe { std::str::from_utf8_unchecked(&ascii) };
+        let ascii = std::str::from_utf8(&ascii).map_err(|_| std::fmt::Error)?;
         formatter.write_str(ascii)
     }
 }
@@ -82,9 +82,11 @@ impl Serialize for HashValue {
     where
         S: Serializer,
     {
+        use serde::ser::Error as _;
         if serializer.is_human_readable() {
             let ascii = self.to_ascii();
-            let ascii = unsafe { std::str::from_utf8_unchecked(&ascii) };
+            let ascii = std::str::from_utf8(&ascii)
+                .map_err(|_| S::Error::custom("Conversion to ASCII produced invalid UTF-8"))?;
             serializer.serialize_str(ascii)
         } else {
             serializer.serialize_bytes(&self.bytes)
