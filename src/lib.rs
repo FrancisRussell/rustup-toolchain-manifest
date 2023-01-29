@@ -4,6 +4,8 @@
     clippy::missing_errors_doc,
     clippy::missing_panics_doc
 )]
+#![forbid(unsafe_code)]
+
 mod error;
 
 /// Types related to digest values
