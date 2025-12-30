@@ -1,5 +1,6 @@
+use crate::error::Error;
+use platforms::Platform;
 use std::str::FromStr;
-use target_lexicon::Triple;
 
 pub const TARGET_INDEPENDENT_NAME: &str = "*";
 
@@ -9,7 +10,7 @@ pub enum SupportedTarget {
     /// The package supports all targets
     Independent,
     /// The package is specific to a particular target
-    Dependent(Triple),
+    Dependent(Platform),
 }
 
 impl std::fmt::Display for SupportedTarget {
@@ -22,20 +23,24 @@ impl std::fmt::Display for SupportedTarget {
 }
 
 impl FromStr for SupportedTarget {
-    type Err = target_lexicon::ParseError;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<SupportedTarget, Self::Err> {
         Ok(if s == TARGET_INDEPENDENT_NAME {
             SupportedTarget::Independent
         } else {
-            SupportedTarget::Dependent(Triple::from_str(s)?)
+            SupportedTarget::Dependent(
+                Platform::find(s)
+                    .ok_or_else(|| Error::UnknownTarget(s.to_string()))?
+                    .clone(),
+            )
         })
     }
 }
 
 impl SupportedTarget {
     #[must_use]
-    pub fn supports(&self, other: &Triple) -> bool {
+    pub fn supports(&self, other: &Platform) -> bool {
         match self {
             SupportedTarget::Independent => true,
             SupportedTarget::Dependent(triple) => triple == other,

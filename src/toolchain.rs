@@ -1,7 +1,7 @@
 use chrono::NaiveDate;
+use platforms::Platform;
 use std::collections::VecDeque;
 use std::str::FromStr;
-use target_lexicon::Triple;
 use thiserror::Error;
 
 /// A Rust release channel
@@ -83,8 +83,8 @@ pub struct Toolchain {
     /// The manifest date
     pub date: Option<NaiveDate>,
 
-    /// The target triple
-    pub host: Option<Triple>,
+    /// The target platform
+    pub host: Option<Platform>,
 }
 
 impl Toolchain {
@@ -110,8 +110,8 @@ pub enum ParseError {
     Channel(#[from] ChannelParseError),
 
     /// The target name was invalid
-    #[error("Failed to target: {0}")]
-    Target(#[from] target_lexicon::ParseError),
+    #[error("Failed to locate target: {0}")]
+    Target(String),
 }
 
 fn intersperse_hyphen<I: Iterator<Item = S>, S: AsRef<str>>(iter: I) -> String {
@@ -150,8 +150,8 @@ impl FromStr for Toolchain {
         }
         if !split.is_empty() {
             let host_candidate = intersperse_hyphen(split.iter());
-            let host = Triple::from_str(&host_candidate)?;
-            result.host = Some(host);
+            let host = Platform::find(&host_candidate).ok_or_else(|| ParseError::Target(host_candidate.to_string()))?;
+            result.host = Some(host.clone());
         }
         Ok(result)
     }

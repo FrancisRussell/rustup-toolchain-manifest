@@ -1,4 +1,4 @@
-use rustup_toolchain_manifest::{Manifest, Toolchain, InstallSpec};
+use rustup_toolchain_manifest::{InstallSpec, Manifest, Toolchain};
 use std::collections::HashSet;
 use std::str::FromStr;
 
@@ -24,10 +24,11 @@ fn main() {
     let target = toolchain.host.expect("Host missing for previously specified toolchain");
     println!(
         "Finding packages on {} for install specification:\n{:#?}\n",
-        target,
-        install_spec
+        target, install_spec
     );
-    let packages = manifest.find_packages_for_install(&target, &install_spec).expect("Failed to find packages");
+    let packages = manifest
+        .find_packages_for_install(&target, &install_spec)
+        .expect("Failed to find packages");
     println!("The following packages are required:");
     for (name, target) in packages {
         println!("{} ({})", name, target);

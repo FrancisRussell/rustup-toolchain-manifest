@@ -33,10 +33,6 @@ pub enum Error {
     #[error("Unknown profile: {0}")]
     UnknownProfile(String),
 
-    /// A target triple could not be parsed
-    #[error("Failed to parse target triple: {0}")]
-    TargetParse(#[from] target_lexicon::ParseError),
-
     /// A target-dependent package was referred to in an target-independent
     /// context.
     #[error("Attempted to treat package {0} as architecture independent")]
