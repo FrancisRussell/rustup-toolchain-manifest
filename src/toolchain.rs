@@ -150,7 +150,7 @@ impl FromStr for Toolchain {
         }
         if !split.is_empty() {
             let host_candidate = intersperse_hyphen(split.iter());
-            let host = Platform::find(&host_candidate).ok_or_else(|| ParseError::Target(host_candidate.to_string()))?;
+            let host = Platform::find(&host_candidate).ok_or_else(|| ParseError::Target(host_candidate.clone()))?;
             result.host = Some(host.clone());
         }
         Ok(result)

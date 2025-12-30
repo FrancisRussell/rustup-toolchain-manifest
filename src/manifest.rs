@@ -177,7 +177,7 @@ impl Manifest {
                     artifacts.insert(
                         compression,
                         RemoteBinary {
-                            url: url.to_string(),
+                            url: url.clone(),
                             digests: std::iter::once((Digest::Sha256, hash.clone())).collect(),
                         },
                     );
@@ -195,7 +195,7 @@ impl Manifest {
         for (name, parsed_package) in &parsed.packages {
             let version_info = match (&parsed_package.version, &parsed_package.git_commit_hash) {
                 (Some(version), Some(git_commit)) => Some(PackageInfo {
-                    version: version.to_string(),
+                    version: version.clone(),
                     git_commit: git_commit.clone(),
                 }),
                 _ => None,
@@ -211,7 +211,7 @@ impl Manifest {
                     let mut artifacts: HashMap<Platform, _> = HashMap::with_capacity(parsed_package.targets.len());
                     for (target_name, parsed_target) in &parsed_package.targets {
                         if target_name == TARGET_INDEPENDENT_NAME {
-                            return Err(Error::ConflictingTargetDependence(name.to_string()));
+                            return Err(Error::ConflictingTargetDependence(name.clone()));
                         }
                         artifacts.insert(
                             Platform::find(target_name.as_str())
@@ -223,11 +223,11 @@ impl Manifest {
                     TargetMap::Dependent(artifacts)
                 };
             let builds = PackageBuilds {
-                name: name.to_string(),
+                name: name.clone(),
                 info: version_info,
                 artifacts,
             };
-            packages.insert(name.to_string(), builds);
+            packages.insert(name.clone(), builds);
         }
         let mut components = HashMap::new();
         let rust = parsed.packages.get("rust").ok_or(Error::RustMissing)?;
@@ -240,7 +240,7 @@ impl Manifest {
                     let component = Component {
                         _is_extension: is_extension,
                     };
-                    let package = parsed_component.package.to_string();
+                    let package = parsed_component.package.clone();
                     let component_target = SupportedTarget::from_str(parsed_component.target.as_str())?;
                     target_components.insert((package, component_target), component);
                 }
@@ -286,14 +286,14 @@ impl Manifest {
                     // If package is architecture dependent add it as $PACKAGE_NAME-$TRIPLE
                     if let SupportedTarget::Dependent(pkg_triple) = supported {
                         let full_name = format!("{}-{}", package_alias, pkg_triple);
-                        name_map.insert(full_name, (package_canonical.to_string(), supported.clone()));
+                        name_map.insert(full_name, (package_canonical.clone(), supported.clone()));
                     }
                     // If this package is for the current target or target-independent, add it
                     // without the suffix as well
                     if supported.supports(target) {
                         name_map.insert(
                             package_alias.to_string(),
-                            (package_canonical.to_string(), supported.clone()),
+                            (package_canonical.clone(), supported.clone()),
                         );
                     }
                 }
@@ -360,7 +360,7 @@ impl Manifest {
         let profile_components = self
             .profiles
             .get(&spec.profile)
-            .ok_or_else(|| Error::UnknownProfile(spec.profile.to_string()))?;
+            .ok_or_else(|| Error::UnknownProfile(spec.profile.clone()))?;
         for component in profile_components {
             match self.resolve_component_name_to_package(host, component) {
                 Ok(package) => {
@@ -399,7 +399,7 @@ impl Manifest {
             let builds = self
                 .packages
                 .get(package_name)
-                .ok_or_else(|| Error::PackageUnknown(package_name.to_string(), target.clone()))?;
+                .ok_or_else(|| Error::PackageUnknown(package_name.clone(), target.clone()))?;
             let build = builds.get(target)?;
             let info = builds
                 .info

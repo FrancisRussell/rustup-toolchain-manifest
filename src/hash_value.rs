@@ -115,7 +115,7 @@ impl std::str::FromStr for HashValue {
     fn from_str(string: &str) -> Result<HashValue, ParseError> {
         let string = string.as_bytes();
         let length = string.len();
-        if length % 2 == 0 {
+        if length.is_multiple_of(2) {
             let mut bytes = vec![0u8; length / 2];
             for (idx, byte) in bytes.iter_mut().enumerate() {
                 let high = Self::ascii_to_nibble(string[idx * 2])?;
