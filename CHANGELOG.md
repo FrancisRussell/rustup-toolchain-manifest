@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.0
 
 * Bump dependency constraints.
 * Switch from `target_lexicon` to `platforms` for representing Rust targets.
