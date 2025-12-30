@@ -1,10 +1,10 @@
 #![allow(clippy::uninlined_format_args)]
 
 use clap::Parser;
+use platforms::Platform;
 use rustup_toolchain_manifest::{InstallSpec, Manifest, Toolchain};
 use std::path::PathBuf;
 use std::str::FromStr;
-use target_lexicon::Triple;
 
 #[derive(Debug, Parser)]
 #[clap(author, version)]
@@ -23,8 +23,11 @@ fn main() {
         components: ["clippy", "rust-src"].into_iter().map(String::from).collect(),
         targets: ["wasm32-unknown-unknown"].into_iter().map(String::from).collect(),
     };
-    let host = Triple::from_str("x86_64-unknown-linux-gnu").expect("Failed to parse triple");
-    println!("For target {}, finding the following toolchain:\n{:#?}", host, spec);
+    let host = Platform::find("x86_64-unknown-linux-gnu").expect("Failed to find platform");
+    println!(
+        "For target {}, finding the following toolchain:\n{:#?}",
+        host.target_triple, spec
+    );
     println!();
     let packages = manifest
         .find_packages_for_install(&host, &spec)

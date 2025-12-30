@@ -67,18 +67,20 @@ Toolchain {
     channel: Nightly,
     date: None,
     host: Some(
-        Triple {
-            architecture: X86_64,
-            vendor: Unknown,
-            operating_system: Linux,
-            environment: Gnu,
-            binary_format: Elf,
+        Platform {
+            target_triple: "x86_64-unknown-linux-gnu",
+            target_arch: X86_64,
+            target_os: Linux,
+            target_env: Gnu,
+            target_pointer_width: U64,
+            target_endian: Little,
+            tier: One,
         },
     ),
 }
 
 Downloading manifest from: https://static.rust-lang.org/dist/channel-rust-nightly.toml
-Successfully retrieved manifest of 769388 bytes.
+Successfully retrieved manifest of 870035 bytes.
 Finding packages on x86_64-unknown-linux-gnu for install specification:
 InstallSpec {
     profile: "default",
@@ -90,10 +92,10 @@ InstallSpec {
 
 The following packages are required:
 rustc (x86_64-unknown-linux-gnu)
+cargo (x86_64-unknown-linux-gnu)
+rust-docs (x86_64-unknown-linux-gnu)
 clippy-preview (x86_64-unknown-linux-gnu)
+rustfmt-preview (x86_64-unknown-linux-gnu)
 rust-std (wasm32-unknown-unknown)
 rust-std (x86_64-unknown-linux-gnu)
-rustfmt-preview (x86_64-unknown-linux-gnu)
-rust-docs (x86_64-unknown-linux-gnu)
-cargo (x86_64-unknown-linux-gnu)
 ```

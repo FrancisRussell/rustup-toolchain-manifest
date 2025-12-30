@@ -2,9 +2,9 @@ use crate::hash_value::HashValue;
 use crate::supported_target::{SupportedTarget, TARGET_INDEPENDENT_NAME};
 use crate::{manifest_v2, Error};
 use chrono::NaiveDate;
+use platforms::Platform;
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
-use target_lexicon::Triple;
 
 /// Represents a Rust toolchain manifest.
 ///
@@ -16,8 +16,8 @@ pub struct Manifest {
     profiles: HashMap<String, Vec<String>>,
     _renames: HashMap<String, String>,
     packages: HashMap<String, PackageBuilds>,
-    _components: HashMap<Triple, HashMap<(String, SupportedTarget), Component>>,
-    component_name_map: HashMap<Triple, HashMap<String, (String, SupportedTarget)>>,
+    _components: HashMap<Platform, HashMap<(String, SupportedTarget), Component>>,
+    component_name_map: HashMap<Platform, HashMap<String, (String, SupportedTarget)>>,
 }
 
 /// An install specification for a Rust toolchain
@@ -162,7 +162,7 @@ pub struct RemoteBinary {
 #[derive(Clone, Debug)]
 enum TargetMap<V> {
     Independent(V),
-    Dependent(HashMap<Triple, V>),
+    Dependent(HashMap<Platform, V>),
 }
 
 impl Manifest {
@@ -177,7 +177,7 @@ impl Manifest {
                     artifacts.insert(
                         compression,
                         RemoteBinary {
-                            url: url.to_string(),
+                            url: url.clone(),
                             digests: std::iter::once((Digest::Sha256, hash.clone())).collect(),
                         },
                     );
@@ -195,7 +195,7 @@ impl Manifest {
         for (name, parsed_package) in &parsed.packages {
             let version_info = match (&parsed_package.version, &parsed_package.git_commit_hash) {
                 (Some(version), Some(git_commit)) => Some(PackageInfo {
-                    version: version.to_string(),
+                    version: version.clone(),
                     git_commit: git_commit.clone(),
                 }),
                 _ => None,
@@ -208,24 +208,26 @@ impl Manifest {
                         .expect("Failed to extract target-independent package");
                     TargetMap::Independent(Self::translate_build(build))
                 } else {
-                    let mut artifacts: HashMap<Triple, _> = HashMap::with_capacity(parsed_package.targets.len());
+                    let mut artifacts: HashMap<Platform, _> = HashMap::with_capacity(parsed_package.targets.len());
                     for (target_name, parsed_target) in &parsed_package.targets {
                         if target_name == TARGET_INDEPENDENT_NAME {
-                            return Err(Error::ConflictingTargetDependence(name.to_string()));
+                            return Err(Error::ConflictingTargetDependence(name.clone()));
                         }
                         artifacts.insert(
-                            Triple::from_str(target_name.as_str())?,
+                            Platform::find(target_name.as_str())
+                                .ok_or_else(|| Error::UnknownTarget(target_name.clone()))?
+                                .clone(),
                             Self::translate_build(parsed_target),
                         );
                     }
                     TargetMap::Dependent(artifacts)
                 };
             let builds = PackageBuilds {
-                name: name.to_string(),
+                name: name.clone(),
                 info: version_info,
                 artifacts,
             };
-            packages.insert(name.to_string(), builds);
+            packages.insert(name.clone(), builds);
         }
         let mut components = HashMap::new();
         let rust = parsed.packages.get("rust").ok_or(Error::RustMissing)?;
@@ -238,12 +240,17 @@ impl Manifest {
                     let component = Component {
                         _is_extension: is_extension,
                     };
-                    let package = parsed_component.package.to_string();
+                    let package = parsed_component.package.clone();
                     let component_target = SupportedTarget::from_str(parsed_component.target.as_str())?;
                     target_components.insert((package, component_target), component);
                 }
             }
-            components.insert(Triple::from_str(target.as_str())?, target_components);
+            components.insert(
+                Platform::find(target.as_str())
+                    .ok_or_else(|| Error::UnknownTarget(target.clone()))?
+                    .clone(),
+                target_components,
+            );
         }
         let renames: HashMap<String, String> = parsed
             .renames
@@ -264,9 +271,9 @@ impl Manifest {
     }
 
     fn build_component_name_map(
-        components: &HashMap<Triple, HashMap<(String, SupportedTarget), Component>>,
+        components: &HashMap<Platform, HashMap<(String, SupportedTarget), Component>>,
         renames: &HashMap<String, String>,
-    ) -> HashMap<Triple, HashMap<String, (String, SupportedTarget)>> {
+    ) -> HashMap<Platform, HashMap<String, (String, SupportedTarget)>> {
         let inverse_renames: HashMap<&str, &str> = renames.iter().map(|(k, v)| (v.as_str(), k.as_str())).collect();
         let mut map = HashMap::with_capacity(components.len());
         for (target, component_map) in components {
@@ -279,14 +286,14 @@ impl Manifest {
                     // If package is architecture dependent add it as $PACKAGE_NAME-$TRIPLE
                     if let SupportedTarget::Dependent(pkg_triple) = supported {
                         let full_name = format!("{}-{}", package_alias, pkg_triple);
-                        name_map.insert(full_name, (package_canonical.to_string(), supported.clone()));
+                        name_map.insert(full_name, (package_canonical.clone(), supported.clone()));
                     }
                     // If this package is for the current target or target-independent, add it
                     // without the suffix as well
                     if supported.supports(target) {
                         name_map.insert(
                             package_alias.to_string(),
-                            (package_canonical.to_string(), supported.clone()),
+                            (package_canonical.clone(), supported.clone()),
                         );
                     }
                 }
@@ -328,7 +335,7 @@ impl Manifest {
     /// independent.
     pub fn resolve_component_name_to_package(
         &self,
-        target: &Triple,
+        target: &Platform,
         component: &str,
     ) -> Result<(String, SupportedTarget), Error> {
         let name_map = self
@@ -346,14 +353,14 @@ impl Manifest {
     /// necessary for that install.
     pub fn find_packages_for_install(
         &self,
-        host: &Triple,
+        host: &Platform,
         spec: &InstallSpec,
     ) -> Result<HashSet<(String, SupportedTarget)>, Error> {
         let mut result = HashSet::new();
         let profile_components = self
             .profiles
             .get(&spec.profile)
-            .ok_or_else(|| Error::UnknownProfile(spec.profile.to_string()))?;
+            .ok_or_else(|| Error::UnknownProfile(spec.profile.clone()))?;
         for component in profile_components {
             match self.resolve_component_name_to_package(host, component) {
                 Ok(package) => {
@@ -374,7 +381,7 @@ impl Manifest {
             result.insert(package);
         }
         for target in &spec.targets {
-            let target = Triple::from_str(target)?;
+            let target = Platform::find(target).ok_or_else(|| Error::UnknownTarget(target.clone()))?;
             let component = format!("{}-{}", "rust-std", target);
             let package = self.resolve_component_name_to_package(host, &component)?;
             result.insert(package);
@@ -385,14 +392,14 @@ impl Manifest {
     /// Given a target triple and a toolchain install specification, return a
     /// list of package descriptions which includes information about the
     /// archives which need to be downloaded.
-    pub fn find_downloads_for_install(&self, host: &Triple, spec: &InstallSpec) -> Result<Vec<Package>, Error> {
+    pub fn find_downloads_for_install(&self, host: &Platform, spec: &InstallSpec) -> Result<Vec<Package>, Error> {
         let mut result = Vec::new();
         let packages = self.find_packages_for_install(host, spec)?;
         for (package_name, target) in &packages {
             let builds = self
                 .packages
                 .get(package_name)
-                .ok_or_else(|| Error::PackageUnknown(package_name.to_string(), target.clone()))?;
+                .ok_or_else(|| Error::PackageUnknown(package_name.clone(), target.clone()))?;
             let build = builds.get(target)?;
             let info = builds
                 .info
